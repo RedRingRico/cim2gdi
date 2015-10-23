@@ -1,0 +1,21 @@
+Microsoft Visual Studio Solution File, Format Version 8.00
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cim2gdi", "cim2gdi.vcproj", "{F720A959-33EF-4338-8231-E54A0983CB8F}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfiguration) = preSolution
+		Debug = Debug
+		Release = Release
+	EndGlobalSection
+	GlobalSection(ProjectConfiguration) = postSolution
+		{F720A959-33EF-4338-8231-E54A0983CB8F}.Debug.ActiveCfg = Debug|Win32
+		{F720A959-33EF-4338-8231-E54A0983CB8F}.Debug.Build.0 = Debug|Win32
+		{F720A959-33EF-4338-8231-E54A0983CB8F}.Release.ActiveCfg = Release|Win32
+		{F720A959-33EF-4338-8231-E54A0983CB8F}.Release.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+	EndGlobalSection
+	GlobalSection(ExtensibilityAddIns) = postSolution
+	EndGlobalSection
+EndGlobal
