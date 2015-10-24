@@ -364,7 +364,7 @@ namespace cim2gdi
 	}
 
 	int CIMFile::WriteTracks( const std::vector< TRACK > &p_Area,
-		const AREA p_AreaType, const int p_Index )
+		const AREA p_AreaType, const unsigned int p_Index )
 	{
 		std::vector< TRACK >::const_iterator TrackItr = p_Area.begin( );
 		unsigned int TrackIndex = p_Index + 1;
