@@ -93,6 +93,7 @@ namespace cim2gdi
 		void PrintTrackInformation( const std::vector< TRACK > &p_Area );
 		int WriteTracks( const std::vector< TRACK > &p_Area,
 			const AREA p_AreaType, const int p_Index = 0 );
+		int WriteGDI( );
 
 		HANDLE	m_File;
 

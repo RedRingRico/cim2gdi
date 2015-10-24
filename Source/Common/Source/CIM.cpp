@@ -145,6 +145,8 @@ namespace cim2gdi
 		// Copy the data from each track in the HDA to track[nm].[raw|bin]
 		this->WriteTracks( m_HDA, AREA_HIGH_DENSITY, m_SDA.size( ) );
 
+		this->WriteGDI( );
+
 		return 0;
 	}
 
@@ -442,7 +444,7 @@ namespace cim2gdi
 				FileName << ".raw";
 			}
 
-			std::cout << "Processing " << FileName.str( ) << std::endl;
+			std::cout << "Processing " << FileName.str( ) << " ... ";
 
 			DWORD BytesWritten;
 
@@ -460,9 +462,104 @@ namespace cim2gdi
 
 			HeapFree( GetProcessHeap( ), 0, pMemoryBlock );
 
+			std::cout << "[OK]" << std::endl;
+
 			++TrackIndex;
 			++TrackItr;
 		}
+
+		return 0;
+	}
+
+	int CIMFile::WriteGDI( )
+	{
+		std::stringstream GDIContents;
+
+		GDIContents << m_SDA.size( ) + m_HDA.size( ) << std::endl;
+
+		std::vector< TRACK >::const_iterator TrackItr = m_SDA.begin( );
+		unsigned int TrackIndex = 1;
+
+		while( TrackItr != m_SDA.end( ) )
+		{
+			GDIContents << TrackIndex << " " << ( *TrackItr ).StartAddress <<
+				" ";
+			unsigned int Type;
+			std::stringstream Name;
+			Name << "track" << std::setw( 2 ) << std::setfill( '0' ) <<
+				TrackIndex << ".";
+
+			switch( ( *TrackItr ).Type )
+			{
+			case TRACK_TYPE_MODE1:
+				{
+					Name << "bin";
+					Type = 4;
+
+					break;
+				}
+			case TRACK_TYPE_CCDA:
+				{
+					Name << "raw";
+					Type = 0;
+
+					break;
+				}
+			}
+
+			GDIContents << Type << " 2352 " << Name.str( ) << " 0" <<
+				std::endl;
+
+			++TrackItr;
+			++TrackIndex;
+		}
+
+		TrackItr = m_HDA.begin( );
+		TrackIndex = m_SDA.size( ) + 1;
+
+		while( TrackItr != m_HDA.end( ) )
+		{
+			GDIContents << TrackIndex << " " << ( *TrackItr ).StartAddress <<
+				" ";
+			unsigned int Type;
+			std::stringstream Name;
+			Name << "track" << std::setw( 2 ) << std::setfill( '0' ) <<
+				TrackIndex << ".";
+
+			switch( ( *TrackItr ).Type )
+			{
+			case TRACK_TYPE_MODE1:
+				{
+					Name << "bin";
+					Type = 4;
+
+					break;
+				}
+			case TRACK_TYPE_CCDA:
+				{
+					Name << "raw";
+					Type = 0;
+
+					break;
+				}
+			}
+
+			GDIContents << Type << " 2352 " << Name.str( ) << " 0" <<
+				std::endl;
+
+			++TrackItr;
+			++TrackIndex;
+		}
+
+		HANDLE GDIFile = CreateFile( "game.gdi", GENERIC_WRITE, 0, NULL,
+			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0 );
+
+		DWORD BytesWritten;
+
+		WriteFile( GDIFile, GDIContents.str( ).c_str( ),
+			GDIContents.str( ).size( ), &BytesWritten, NULL );
+
+		CloseHandle( GDIFile );
 
 		return 0;
 	}
