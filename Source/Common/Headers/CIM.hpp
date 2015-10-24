@@ -3,6 +3,7 @@
 
 #include <windows.h>
 #include <string>
+#include <vector>
 
 namespace cim2gdi
 {
@@ -10,6 +11,12 @@ namespace cim2gdi
 	{
 		AREA_SINGLE_DENSITY = 0x00000001,
 		AREA_HIGH_DENSITY	= 0x00000002
+	};
+
+	enum TRACK_TYPE
+	{
+		TRACK_TYPE_MODE1	= 1,
+		TRACK_TYPE_CCDA		= 2
 	};
 
 #pragma pack( push, 1 )
@@ -41,6 +48,14 @@ namespace cim2gdi
 		char			Padding[ 8 ];
 	};
 
+	struct TRACK
+	{
+		unsigned int	PhysicalAddress;
+		unsigned int	StartAddress;
+		unsigned int	Size;
+		TRACK_TYPE		Type;
+	};
+
 	struct TRACK_ENTRY
 	{
 		unsigned char	Control;
@@ -66,20 +81,23 @@ namespace cim2gdi
 
 		int Parse( );
 
+		int GetSDATrackCount( ) const;
+		int GetHDATrackCount( ) const;
+
+		int GetTrackAt( bool p_SDA, int Track, TRACK &p_Track ) const;
+
 	private:
+		int ParseHeader( );
+
+		int ExtractTracks( std::vector< TRACK > &p_Area );
+
 		HANDLE	m_File;
+
+		CIM_HEADER	m_CIMHeader;
+
+		std::vector< TRACK >	m_SDA;
+		std::vector< TRACK >	m_HDA;
 	};
 }
-
-//NOTES
-// 0x0562A0 - 150 physical sectors in (0)
-// 0x1BAC10 - 771 physical sectors in (921) (02/00)
-// 0x214790 - Start of audio track
-
-// 0x101DB0 - Last sector for 00:06:00
-// 0x1026E0 - End of sector
-// 0x15C26C - Beginning of the audio
-// 0x05940C - Distance to audio
-// 0x233E2C - End of audio 
 
 #endif // __CIM2GDI_CIM_HPP__
