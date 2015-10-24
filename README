@@ -1,0 +1,38 @@
+cim2gdi - README
+
+| OVERVIEW |
+cim2gdi is a tool for converting files generated with CD Craft from the SEGA
+Katana (Dreamcast) SDK into GDI files for use with emulators and the DC2CD
+tool.
+
+| USAGE |
+Simply run cim2gdi with the CIM file as the parameter.  Multiple track files
+will be generated along with the corresponding GDI file.
+
+This version of the tool requires 1.2GiB free RAM.
+
+Example:
+cim2gdi GAME.cim
+
+This produces the tracks as .raw and .bin files, with .raw being audio and .bin
+being data.
+
+| BUILDING |
+In order to build the source, you will need a Windows PC and Microsoft Visual
+Studio (makefiles for MinGW and Visual Studio coming later).  Open the Solution
+file in Source/Windows and build the Release version.
+
+
+| ROADMAP |
+The goal of this early build is to get something working that processes full
+CIM files.  Unfortunately, this also means the code is not very elegant and the
+functionality is lacking.
+
+| ROADMAP/GOALS |
+* Linux build
+* MinGW build
+* GUI to navigate the CIM file
+* Progress indicators (currently takes ~2 minutes on a computer with an IDE
+  hard drive, 2GiB 400MHz RAM, and a 1GHz 32-bit AMD Athlon)
+* Non-full image format support
+
