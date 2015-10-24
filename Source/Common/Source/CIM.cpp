@@ -51,7 +51,7 @@ namespace cim2gdi
 		// Jump to the SDA TOC
 		SetFilePointer( m_File, m_CIMHeader.SDATOC, NULL, FILE_BEGIN );
 
-		SDA_TOC SDATOC;
+		TOC SDATOC;
 
 		ReadFile( m_File, &SDATOC, sizeof( SDATOC ), &BytesRead,
 			NULL );
@@ -59,7 +59,7 @@ namespace cim2gdi
 		ZeroMemory( IDString, sizeof( IDString ) );
 		memcpy( IDString, SDATOC.ID, sizeof( SDATOC.ID ) );
 
-		SDATOC.SDADisc = SwapUInt32( SDATOC.SDADisc );
+		SDATOC.DiscOffset = SwapUInt32( SDATOC.DiscOffset );
 
 		std::cout << "Single Density Area TOC Information" << std::endl;
 
@@ -67,155 +67,19 @@ namespace cim2gdi
 
 		std::cout << std::setfill( '0' ) << std::hex;
 		std::cout << "\tDisc: 0x" << std::setw( 8 ) <<
-			SDATOC.SDADisc << std::endl;
-		std::cout << std::setfill( ' ' ) << std::dec;		
-
-		/*do
-		{
-			TRACK_ENTRY TrackEntry;
-
-			ReadFile( m_File, &TrackEntry, sizeof( TrackEntry ),
-				&BytesRead, NULL );
-
-			++TrackCounter;
-
-			unsigned int LSN = ( ( ( TrackEntry.Minutes & 0xF ) +
-				( ( ( TrackEntry.Minutes & 0xF0 ) >> 4 ) * 10 ) * 60 * 75 ) +
-				( ( TrackEntry.Seconds & 0x0F ) +
-				( ( ( TrackEntry.Seconds & 0xF0 ) >> 4 ) * 10 ) ) * 75 ) +
-				( TrackEntry.Frames & 0x0F ) +
-				( ( ( TrackEntry.Frames & 0xF0 ) >> 4 ) * 10 );
-
-			// The nn/00 track seems to be the beginning of the actual track
-			// while nn/01 appears to indicate the offset to the data
-			if( TrackEntry.Transform == 0 )
-			{
-				PreviousTrack = CurrentTrack;
-				ZeroMemory( &CurrentTrack, sizeof( CurrentTrack ) );
-
-				CurrentTrack.StartAddress = LSN;
-
-				if( PreviousTrack.PhysicalAddress != 0 )
-				{
-					PreviousTrack.Size = CurrentTrack.StartAddress -
-						PreviousTrack.PhysicalAddress;
-
-					m_SDA.push_back( PreviousTrack );
-				}
-			}
-			if( TrackEntry.Transform == 1 )
-			{
-				if( TrackEntry.TrackNumber != 0xAA )
-				{
-					CurrentTrack.PhysicalAddress = LSN;
-				}
-			}
-			
-			std::string TrackType = TrackEntry.Control == 0x41 ?
-				"DATA" : "AUDIO";
-			std::string TrackForm;
-			
-			if( TrackEntry.Form == 0x02 )
-			{
-				TrackForm = "MODE1";
-				CurrentTrack.Type = TRACK_TYPE_MODE1;
-			}
-			if( TrackEntry.Form == 0x00 )
-			{
-				TrackForm = "CCDA";
-				CurrentTrack.Type = TRACK_TYPE_CCDA;
-			}
-
-			std::cout << "\t\t" << TrackType << " ";
-
-			if( ( TrackEntry.TrackNumber == 0x00 ) &&
-				( TrackEntry.TrackNumber == 0x00 ) )
-			{
-				std::cout << "LeadIn";
-			}
-			else if( ( TrackEntry.TrackNumber == 0xAA ) &&
-				( TrackEntry.Transform == 0x01 ) )
-			{
-				std::cout << "LeadOut";
-
-				PreviousTrack = CurrentTrack;
-				ZeroMemory( &CurrentTrack, sizeof( CurrentTrack ) );
-
-				CurrentTrack.StartAddress = LSN;
-
-				if( PreviousTrack.PhysicalAddress != 0 )
-				{
-					PreviousTrack.Size = CurrentTrack.StartAddress -
-						PreviousTrack.PhysicalAddress;
-
-					m_SDA.push_back( PreviousTrack );
-				}
-
-				// Two tracks are used for 16-byte alignment
-				if( ( TrackCounter % 2 ) != 0 )
-				{
-					// Skip over a track not read in
-					SetFilePointer( m_File, 8, NULL, FILE_CURRENT );
-				}
-				Track = false;
-			}
-			else
-			{
-				std::cout <<+TrackEntry.TrackNumber << "/" <<
-					+TrackEntry.Transform;
-			}
-
-			std::cout << " " << +TrackEntry.Hours << ":" <<
-				( TrackEntry.Minutes & 0x0F ) +
-				( ( ( TrackEntry.Minutes & 0xF0 ) >> 4 ) * 10 ) <<
-				":" <<
-				( TrackEntry.Seconds & 0x0F ) +
-				( ( ( TrackEntry.Seconds & 0xF0 ) >> 4 ) * 10 ) <<
-				":" << 
-				( TrackEntry.Frames & 0x0F ) +
-				( ( ( TrackEntry.Frames & 0xF0 ) >> 4 ) * 10 ) << " ";
-			
-
-			std::cout << "LSN: " << LSN << std::endl;
-		}while( Track );*/
+			SDATOC.DiscOffset << std::endl;
+		std::cout << std::setfill( ' ' ) << std::dec;
 
 		this->ExtractTracks( m_SDA );
 
-		std::vector< TRACK >::const_iterator Itr = m_SDA.begin( );
+		std::cout << "Processed SDA Tracks" << std::endl;
 
-		std::cout << "Processed tracks" << std::endl;
-
-		unsigned int TrackNumber = 1UL;
-
-		while( Itr != m_SDA.end( ) )
-		{
-			std::string TypeString;
-
-			if( ( *Itr ).Type == TRACK_TYPE_MODE1 )
-			{
-				TypeString = "MODE1";
-			}
-			else if( ( *Itr ).Type == TRACK_TYPE_CCDA )
-			{
-				TypeString = "CCDA";
-			}
-			else
-			{
-				TypeString = "UNKNOWN";
-			}
-
-			std::cout << "\tTrack " << TrackNumber << ": Start: " <<
-				( *Itr ).StartAddress << " | Physical: " <<
-				( *Itr ).PhysicalAddress << " | Size: " <<
-				( *Itr ).Size << " | Type: " << TypeString << std::endl;
-			++TrackNumber;
-			++Itr;
-		}
+		this->PrintTrackInformation( m_SDA );
 
 		// Get the SDA Disc
 		SetFilePointer( m_File, m_CIMHeader.SDADisc, NULL, FILE_BEGIN );
 
-		SDA_DISC SDADisc;
+		DISC SDADisc;
 		ReadFile( m_File, &SDADisc, sizeof( SDADisc ), &BytesRead, NULL );
 
 		ZeroMemory( IDString, sizeof( IDString ) );
@@ -231,65 +95,55 @@ namespace cim2gdi
 		std::cout << std::dec << std::setfill( ' ' );
 
 		// Copy the data from each track in the SDA to track[nm].[raw|bin]
+		this->WriteTracks( m_SDA, AREA_SINGLE_DENSITY );
 
-		// Allocate enough memory to hold the entire SDA
-		DWORD MemorySize = SDADisc.Size;
-		
-		LPVOID pMemoryBlock = HeapAlloc( GetProcessHeap( ), 0, MemorySize );
+		// Get the HDA information
+		SetFilePointer( m_File, m_CIMHeader.HDATOC, NULL, FILE_BEGIN );
 
-		if( pMemoryBlock == NULL )
-		{
-			std::cout << "COULD NOT ALLOCATE MEMORY" << std::endl;
-			return 1;
-		}
-		else
-		{
-			std::cout << "Allocated " << MemorySize / MiB << "MiB RAM" <<
-				std::endl;
-		}
+		TOC HDATOC;
 
-		std::vector< TRACK >::const_iterator TrackItr = m_SDA.begin( );
-		unsigned int TrackCount = 1;
+		ReadFile( m_File, &HDATOC, sizeof( HDATOC ), &BytesRead, NULL );
 
-		while( TrackItr != m_SDA.end( ) )
-		{
-			SetFilePointer( m_File, m_CIMHeader.SDADisc + sizeof( SDADisc ) +
-				( 2352 * ( *TrackItr ).PhysicalAddress ), NULL, FILE_BEGIN );
+		ZeroMemory( IDString, sizeof( IDString ) );
+		memcpy( IDString, HDATOC.ID, sizeof( HDATOC.ID ) );
 
-			std::stringstream FileName;
-			FileName << "track" << std::setw( 2 ) << std::setfill( '0' ) <<
-				TrackCount;
-			
-			if( ( *TrackItr ).Type == TRACK_TYPE_MODE1 )
-			{
-				FileName << ".bin";
-			}
-			else if( ( *TrackItr ).Type == TRACK_TYPE_CCDA )
-			{
-				FileName << ".raw";
-			}
+		HDATOC.DiscOffset = SwapUInt32( HDATOC.DiscOffset );
 
-			std::cout << "Processing " << FileName.str( ) << std::endl;
+		std::cout << "High Density Area TOC Information" << std::endl;
 
-			DWORD BytesWritten;
+		std::cout << "\tID:   " << IDString << std::endl;
 
-			ReadFile( m_File, pMemoryBlock, 2352 * ( *TrackItr ).Size,
-				&BytesRead, NULL );
+		std::cout << std::setfill( '0' ) << std::hex;
+		std::cout << "\tDisc: 0x" << std::setw( 8 ) <<
+			SDATOC.DiscOffset << std::endl;
+		std::cout << std::setfill( ' ' ) << std::dec;
 
-			HANDLE TrackFile = CreateFile( FileName.str( ).c_str( ),
-				GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
-				0 );
-			
-			WriteFile( TrackFile, pMemoryBlock, 2352 * ( *TrackItr ).Size,
-				&BytesWritten, NULL );
+		this->ExtractTracks( m_HDA );
 
-			CloseHandle( TrackFile );
+		std::cout << "Processed HDA Tracks" << std::endl;
 
-			++TrackCount;
-			++TrackItr;
-		}
+		this->PrintTrackInformation( m_HDA );
 
-		HeapFree( GetProcessHeap( ), 0, pMemoryBlock );
+		// Get the HDA Disc
+		SetFilePointer( m_File, m_CIMHeader.HDADisc, NULL, FILE_BEGIN );
+
+		DISC HDADisc;
+		ReadFile( m_File, &HDADisc, sizeof( HDADisc ), &BytesRead, NULL );
+
+		ZeroMemory( IDString, sizeof( IDString ) );
+		memcpy( IDString, HDADisc.ID, sizeof( HDADisc.ID ) );
+
+		HDADisc.Size = SwapUInt32( HDADisc.Size );
+
+		std::cout << "High Density Area Disc Information" << std::endl;
+		std::cout << "\tID:   " << IDString << std::endl;
+		std::cout << std::hex << std::setfill( '0' );
+		std::cout << "\tSize: 0x" << std::setw( 8 ) << HDADisc.Size <<
+			std::endl;
+		std::cout << std::dec << std::setfill( ' ' );
+
+		// Copy the data from each track in the HDA to track[nm].[raw|bin]
+		this->WriteTracks( m_HDA, AREA_HIGH_DENSITY, m_SDA.size( ) );
 
 		return 0;
 	}
@@ -364,17 +218,25 @@ namespace cim2gdi
 
 			++TrackCounter;
 
-			unsigned int LSN = ( ( ( TrackEntry.Minutes & 0xF ) +
-				( ( ( TrackEntry.Minutes & 0xF0 ) >> 4 ) * 10 ) * 60 * 75 ) +
-				( ( TrackEntry.Seconds & 0x0F ) +
-				( ( ( TrackEntry.Seconds & 0xF0 ) >> 4 ) * 10 ) ) * 75 ) +
+			unsigned int LSN =
+				( ( ( TrackEntry.Minutes & 0xF ) +
+					( ( ( TrackEntry.Minutes & 0xF0 ) >> 4 ) * 10 ) )
+						* 60 * 75 ) +
+				( ( ( TrackEntry.Seconds & 0x0F ) +
+					( ( ( TrackEntry.Seconds & 0xF0 ) >> 4 ) * 10 ) ) * 75 ) +
 				( TrackEntry.Frames & 0x0F ) +
-				( ( ( TrackEntry.Frames & 0xF0 ) >> 4 ) * 10 );
+					( ( ( TrackEntry.Frames & 0xF0 ) >> 4 ) * 10 );
 
 			// The nn/00 track seems to be the beginning of the actual track
 			// while nn/01 appears to indicate the offset to the data
 			if( TrackEntry.Transform == 0 )
 			{
+				/*if( NextTrackFirst == true )
+				{
+					TrackOffset = LSN;
+					NextTrackFirst = false;
+				}*/
+
 				PreviousTrack = CurrentTrack;
 				ZeroMemory( &CurrentTrack, sizeof( CurrentTrack ) );
 
@@ -391,7 +253,7 @@ namespace cim2gdi
 			if( TrackEntry.Transform == 1 )
 			{
 				if( TrackEntry.TrackNumber != 0xAA )
-				{
+				{					
 					CurrentTrack.PhysicalAddress = LSN;
 				}
 			}
@@ -463,6 +325,144 @@ namespace cim2gdi
 
 			std::cout << "LSN: " << LSN << std::endl;
 		}while( Track );
+
+		return 0;
+	}
+
+	void CIMFile::PrintTrackInformation( const std::vector< TRACK > &p_Area )
+	{
+		std::vector< TRACK >::const_iterator TrackItr = p_Area.begin( );
+
+		unsigned int TrackNumber = 1UL;
+
+		while( TrackItr != p_Area.end( ) )
+		{
+			std::string TypeString;
+
+			if( ( *TrackItr ).Type == TRACK_TYPE_MODE1 )
+			{
+				TypeString = "MODE1";
+			}
+			else if( ( *TrackItr ).Type == TRACK_TYPE_CCDA )
+			{
+				TypeString = "CCDA";
+			}
+			else
+			{
+				TypeString = "UNKNOWN";
+			}
+
+			std::cout << "\tTrack " << TrackNumber << ": Start: " <<
+				( *TrackItr ).StartAddress << " | Physical: " <<
+				( *TrackItr ).PhysicalAddress << " | Size: " <<
+				( *TrackItr ).Size << " | Type: " << TypeString << std::endl;
+			++TrackNumber;
+			++TrackItr;
+		}
+	}
+
+	int CIMFile::WriteTracks( const std::vector< TRACK > &p_Area,
+		const AREA p_AreaType, const int p_Index )
+	{
+		std::vector< TRACK >::const_iterator TrackItr = p_Area.begin( );
+		unsigned int TrackIndex = p_Index + 1;
+		LONG Offset = 0L;
+
+		while( TrackItr != p_Area.end( ) )
+		{
+			DWORD BytesRead;
+			size_t MemorySize = 2352 * ( *TrackItr ).Size;
+
+			LPVOID pMemoryBlock = HeapAlloc( GetProcessHeap( ), 0,
+				MemorySize );
+
+			if( pMemoryBlock == NULL )
+			{
+				std::cout << "COULD NOT ALLOCATE MEMORY" << std::endl;
+				return 1;
+			}
+			else
+			{
+				std::cout << "Allocated ";
+				if( MemorySize < KiB )
+				{
+					std::cout << MemorySize << "B";
+				}
+				else if( MemorySize < MiB )
+				{
+					std::cout << MemorySize / KiB << "KiB";
+				}
+				else if( MemorySize < GiB )
+				{
+					std::cout << MemorySize / MiB << "MiB";
+				}
+				else
+				{
+					std::cout << MemorySize / GiB << "GiB";
+				}
+				std::cout << " RAM" <<
+					std::endl;
+			}
+
+			if( p_Index == ( TrackIndex - 1 ) )
+			{
+				Offset = ( *TrackItr ).PhysicalAddress -
+					( ( *TrackItr ).StartAddress * 2 );
+			}
+
+			LONG MoveTo = sizeof( DISC ) +
+				( 2352 * ( ( *TrackItr ).StartAddress + Offset ) );
+
+			switch( p_AreaType )
+			{
+			case AREA_SINGLE_DENSITY:
+				{
+					MoveTo += m_CIMHeader.SDADisc;
+					break;
+				}
+			case AREA_HIGH_DENSITY:
+				{
+					MoveTo += m_CIMHeader.HDADisc;
+					break;
+				}
+			}
+
+			SetFilePointer( m_File, MoveTo, NULL, FILE_BEGIN );
+
+			std::stringstream FileName;
+			FileName << "track" << std::setw( 2 ) << std::setfill( '0' ) <<
+				TrackIndex;
+			
+			if( ( *TrackItr ).Type == TRACK_TYPE_MODE1 )
+			{
+				FileName << ".bin";
+			}
+			else if( ( *TrackItr ).Type == TRACK_TYPE_CCDA )
+			{
+				FileName << ".raw";
+			}
+
+			std::cout << "Processing " << FileName.str( ) << std::endl;
+
+			DWORD BytesWritten;
+
+			ReadFile( m_File, pMemoryBlock, 2352 * ( *TrackItr ).Size,
+				&BytesRead, NULL );
+
+			HANDLE TrackFile = CreateFile( FileName.str( ).c_str( ),
+				GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+				0 );
+			
+			WriteFile( TrackFile, pMemoryBlock, 2352 * ( *TrackItr ).Size,
+				&BytesWritten, NULL );
+
+			CloseHandle( TrackFile );
+
+			HeapFree( GetProcessHeap( ), 0, pMemoryBlock );
+
+			++TrackIndex;
+			++TrackItr;
+		}
 
 		return 0;
 	}

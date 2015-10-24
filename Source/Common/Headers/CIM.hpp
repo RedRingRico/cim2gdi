@@ -34,14 +34,14 @@ namespace cim2gdi
 		char			Padding[ 12 ];
 	};
 
-	struct SDA_TOC
+	struct TOC
 	{
 		char			ID[ 4 ];
-		unsigned int	SDADisc;
+		unsigned int	DiscOffset;
 		char			Padding[ 8 ];
 	};
 
-	struct SDA_DISC
+	struct DISC
 	{
 		char			ID[ 4 ];
 		unsigned int	Size;
@@ -84,12 +84,15 @@ namespace cim2gdi
 		int GetSDATrackCount( ) const;
 		int GetHDATrackCount( ) const;
 
-		int GetTrackAt( bool p_SDA, int Track, TRACK &p_Track ) const;
+		int GetTrackAt( bool p_SDA, int Track, TRACK &p_Track,
+			const AREA p_AreaType ) const;
 
 	private:
 		int ParseHeader( );
-
 		int ExtractTracks( std::vector< TRACK > &p_Area );
+		void PrintTrackInformation( const std::vector< TRACK > &p_Area );
+		int WriteTracks( const std::vector< TRACK > &p_Area,
+			const AREA p_AreaType, const int p_Index = 0 );
 
 		HANDLE	m_File;
 
