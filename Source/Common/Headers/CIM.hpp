@@ -71,8 +71,8 @@ namespace cim2gdi
 		unsigned char	Control;
 		// Canonical track number
 		unsigned char	TrackNumber;
-		// Seems to indicate the start/end of a track's padding (not sure)
-        unsigned char	Transform;
+		// IDX 0 - pregap, 1 - track
+        unsigned char	Index;
 		// MODE1 0x01/CCDA 0x02
 		unsigned char	Form;
 		// The following are in BCD (hours may be padding)
@@ -87,8 +87,14 @@ namespace cim2gdi
 	{
 		unsigned int	PhysicalAddress;
 		unsigned int	StartAddress;
+		unsigned int	TNO;
+		unsigned int	IDX;
 		unsigned int	Size;
 		TRACK_TYPE		Type;
+
+		unsigned int	doffset;
+		unsigned int	dsize;
+		unsigned int	dskip;
 	};
 #pragma pack( pop )
 

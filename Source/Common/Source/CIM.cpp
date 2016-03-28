@@ -200,11 +200,12 @@ namespace cim2gdi
 	int CIMFile::ExtractTracks( std::vector< TRACK > &p_Area )
 	{
 		DWORD BytesRead;
-		unsigned int TrackCounter = 0UL;
 
 		TRACK CurrentTrack, PreviousTrack;
 		ZeroMemory( &CurrentTrack, sizeof( CurrentTrack ) );
 		ZeroMemory( &PreviousTrack, sizeof( PreviousTrack ) );
+
+		unsigned int cur_offset = 0;
 
 		// Keep reading track entries until the lead out is found
 		bool Track = true;
@@ -218,8 +219,6 @@ namespace cim2gdi
 			ReadFile( m_File, &TrackEntry, sizeof( TrackEntry ),
 				&BytesRead, NULL );
 
-			++TrackCounter;
-
 			unsigned int LSN =
 				( ( ( TrackEntry.Minutes & 0xF ) +
 					( ( ( TrackEntry.Minutes & 0xF0 ) >> 4 ) * 10 ) )
@@ -229,37 +228,27 @@ namespace cim2gdi
 				( TrackEntry.Frames & 0x0F ) +
 					( ( ( TrackEntry.Frames & 0xF0 ) >> 4 ) * 10 );
 
-			// The nn/00 track seems to be the beginning of the actual track
-			// while nn/01 appears to indicate the offset to the data
-			if( TrackEntry.Transform == 0 )
-			{
-				/*if( NextTrackFirst == true )
-				{
-					TrackOffset = LSN;
-					NextTrackFirst = false;
-				}*/
+			PreviousTrack = CurrentTrack;
 
-				PreviousTrack = CurrentTrack;
-				ZeroMemory( &CurrentTrack, sizeof( CurrentTrack ) );
+			ZeroMemory(&CurrentTrack, sizeof(CurrentTrack));
+			CurrentTrack.StartAddress = LSN - 150;
+			CurrentTrack.PhysicalAddress = LSN;
+			CurrentTrack.TNO = TrackEntry.TrackNumber;
+			CurrentTrack.IDX = TrackEntry.Index;
 
-				CurrentTrack.StartAddress = LSN;
+			PreviousTrack.Size = CurrentTrack.PhysicalAddress - PreviousTrack.PhysicalAddress;
 
-				if( PreviousTrack.PhysicalAddress != 0 )
-				{
-					PreviousTrack.Size = CurrentTrack.StartAddress -
-						PreviousTrack.PhysicalAddress;
+			if (PreviousTrack.TNO != 0)
+				cur_offset += PreviousTrack.Size * ((PreviousTrack.Type == TRACK_TYPE_MODE1) ? 2352 : 2450);
+			CurrentTrack.doffset = cur_offset;
 
-					p_Area.push_back( PreviousTrack );
-				}
-			}
-			if( TrackEntry.Transform == 1 )
-			{
-				if( TrackEntry.TrackNumber != 0xAA )
-				{					
-					CurrentTrack.PhysicalAddress = LSN;
-				}
-			}
-			
+			if (PreviousTrack.TNO > 0 && PreviousTrack.TNO <= 0x99 && PreviousTrack.IDX != 0)
+				p_Area.push_back(PreviousTrack);
+
+			// post gap detect (in GDI it is part of track)
+			if (PreviousTrack.TNO == CurrentTrack.TNO && PreviousTrack.IDX == 0 && CurrentTrack.IDX == 0 && PreviousTrack.Type != CurrentTrack.Type)
+				p_Area.back().Size += PreviousTrack.Size;
+
 			std::string TrackType = TrackEntry.Control == 0x41 ?
 				"DATA" : "AUDIO";
 			std::string TrackForm;
@@ -268,50 +257,37 @@ namespace cim2gdi
 			{
 				TrackForm = "MODE1";
 				CurrentTrack.Type = TRACK_TYPE_MODE1;
+				CurrentTrack.dsize = 2048;
+				CurrentTrack.dskip = 304;
+				CurrentTrack.doffset += 16;
 			}
 			if( TrackEntry.Form == 0x00 )
 			{
 				TrackForm = "CCDA";
 				CurrentTrack.Type = TRACK_TYPE_CCDA;
+				CurrentTrack.dsize = 2352;
+				CurrentTrack.dskip = 98;
 			}
 
 			std::cout << "\t\t" << TrackType << " ";
 
-			if( ( TrackEntry.TrackNumber == 0x00 ) &&
-				( TrackEntry.TrackNumber == 0x00 ) )
+			if( TrackEntry.TrackNumber == 0x00 )
 			{
 				std::cout << "LeadIn";
 			}
-			else if( ( TrackEntry.TrackNumber == 0xAA ) &&
-				( TrackEntry.Transform == 0x01 ) )
+			else if( TrackEntry.TrackNumber == 0xAA )
 			{
 				std::cout << "LeadOut";
 
 				PreviousTrack = CurrentTrack;
 				ZeroMemory( &CurrentTrack, sizeof( CurrentTrack ) );
 
-				CurrentTrack.StartAddress = LSN;
-
-				if( PreviousTrack.PhysicalAddress != 0 )
-				{
-					PreviousTrack.Size = CurrentTrack.StartAddress -
-						PreviousTrack.PhysicalAddress;
-
-					p_Area.push_back( PreviousTrack );
-				}
-
-				// Two tracks are used for 16-byte alignment
-				if( ( TrackCounter % 2 ) != 0 )
-				{
-					// Skip over a track not read in
-					SetFilePointer( m_File, 8, NULL, FILE_CURRENT );
-				}
 				Track = false;
 			}
 			else
 			{
 				std::cout <<+TrackEntry.TrackNumber << "/" <<
-					+TrackEntry.Transform;
+					+TrackEntry.Index;
 			}
 
 			std::cout << " " << +TrackEntry.Hours << ":" <<
@@ -368,12 +344,11 @@ namespace cim2gdi
 	{
 		std::vector< TRACK >::const_iterator TrackItr = p_Area.begin( );
 		unsigned int TrackIndex = p_Index + 1;
-		LONG Offset = 0L;
 
 		while( TrackItr != p_Area.end( ) )
 		{
 			DWORD BytesRead;
-			size_t MemorySize = 2352 * ( *TrackItr ).Size;
+			size_t MemorySize = ( *TrackItr ).dsize;
 
 			LPVOID pMemoryBlock = HeapAlloc( GetProcessHeap( ), 0,
 				MemorySize );
@@ -406,28 +381,19 @@ namespace cim2gdi
 					std::endl;
 			}
 
-			if( p_Index == ( TrackIndex - 1 ) )
-			{
-				Offset = ( *TrackItr ).PhysicalAddress -
-					( ( *TrackItr ).StartAddress * 2 );
-			}
-
-			LONG MoveTo = sizeof( DISC ) +
-				( 2352 * ( ( *TrackItr ).StartAddress + Offset ) );
+			LONG MoveTo = sizeof(DISC);
 
 			switch( p_AreaType )
 			{
 			case AREA_SINGLE_DENSITY:
-				{
-					MoveTo += m_CIMHeader.SDADisc;
-					break;
-				}
+				MoveTo += m_CIMHeader.SDADisc;
+				break;
 			case AREA_HIGH_DENSITY:
-				{
-					MoveTo += m_CIMHeader.HDADisc;
-					break;
-				}
+				MoveTo += m_CIMHeader.HDADisc;
+				break;
 			}
+
+			MoveTo += (*TrackItr).doffset;
 
 			SetFilePointer( m_File, MoveTo, NULL, FILE_BEGIN );
 
@@ -448,15 +414,19 @@ namespace cim2gdi
 
 			DWORD BytesWritten;
 
-			ReadFile( m_File, pMemoryBlock, 2352 * ( *TrackItr ).Size,
-				&BytesRead, NULL );
-
-			HANDLE TrackFile = CreateFile( FileName.str( ).c_str( ),
+			HANDLE TrackFile = CreateFile(FileName.str().c_str(),
 				GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
-				0 );
-			
-			WriteFile( TrackFile, pMemoryBlock, 2352 * ( *TrackItr ).Size,
-				&BytesWritten, NULL );
+				0);
+
+			for (unsigned int i = 0; i < (*TrackItr).Size; i++) {
+				ReadFile(m_File, pMemoryBlock, (*TrackItr).dsize,
+					&BytesRead, NULL);
+
+				WriteFile(TrackFile, pMemoryBlock, (*TrackItr).dsize,
+					&BytesWritten, NULL);
+
+				SetFilePointer(m_File, (*TrackItr).dskip, NULL, FILE_CURRENT);
+			}
 
 			CloseHandle( TrackFile );
 
@@ -507,7 +477,7 @@ namespace cim2gdi
 				}
 			}
 
-			GDIContents << Type << " 2352 " << Name.str( ) << " 0" <<
+			GDIContents << Type << " " << (*TrackItr).dsize << " " << Name.str( ) << " 0" <<
 				std::endl;
 
 			++TrackItr;
@@ -544,7 +514,7 @@ namespace cim2gdi
 				}
 			}
 
-			GDIContents << Type << " 2352 " << Name.str( ) << " 0" <<
+			GDIContents << Type << " " << (*TrackItr).dsize << " " << Name.str() << " 0" <<
 				std::endl;
 
 			++TrackItr;
