@@ -59,18 +59,18 @@ namespace cim2gdi
 		ZeroMemory( IDString, sizeof( IDString ) );
 		memcpy( IDString, SDATOC.ID, sizeof( SDATOC.ID ) );
 
-		SDATOC.DiscOffset = SwapUInt32( SDATOC.DiscOffset );
+		SDATOC.Size = SwapUInt32( SDATOC.Size );
 
 		std::cout << "Single Density Area TOC Information" << std::endl;
 
 		std::cout << "\tID:   " << IDString << std::endl;
 
 		std::cout << std::setfill( '0' ) << std::hex;
-		std::cout << "\tDisc: 0x" << std::setw( 8 ) <<
-			SDATOC.DiscOffset << std::endl;
+		std::cout << "\tSize: 0x" << std::setw( 8 ) <<
+			SDATOC.Size << std::endl;
 		std::cout << std::setfill( ' ' ) << std::dec;
 
-		this->ExtractTracks( m_SDA );
+		this->ExtractTracks(m_SDA, SDATOC.Size / 8);
 
 		std::cout << "Processed SDA Tracks" << std::endl;
 
@@ -107,18 +107,18 @@ namespace cim2gdi
 		ZeroMemory( IDString, sizeof( IDString ) );
 		memcpy( IDString, HDATOC.ID, sizeof( HDATOC.ID ) );
 
-		HDATOC.DiscOffset = SwapUInt32( HDATOC.DiscOffset );
+		HDATOC.Size = SwapUInt32( HDATOC.Size );
 
 		std::cout << "High Density Area TOC Information" << std::endl;
 
 		std::cout << "\tID:   " << IDString << std::endl;
 
 		std::cout << std::setfill( '0' ) << std::hex;
-		std::cout << "\tDisc: 0x" << std::setw( 8 ) <<
-			SDATOC.DiscOffset << std::endl;
+		std::cout << "\tSize: 0x" << std::setw( 8 ) <<
+			HDATOC.Size << std::endl;
 		std::cout << std::setfill( ' ' ) << std::dec;
 
-		this->ExtractTracks( m_HDA );
+		this->ExtractTracks(m_HDA, HDATOC.Size / 8);
 
 		std::cout << "Processed HDA Tracks" << std::endl;
 
@@ -197,7 +197,7 @@ namespace cim2gdi
 		return 0;
 	}
 
-	int CIMFile::ExtractTracks( std::vector< TRACK > &p_Area )
+	int CIMFile::ExtractTracks(std::vector< TRACK > &p_Area, unsigned int entrynum)
 	{
 		DWORD BytesRead;
 
@@ -207,12 +207,9 @@ namespace cim2gdi
 
 		unsigned int cur_offset = 0;
 
-		// Keep reading track entries until the lead out is found
-		bool Track = true;
-
 		std::cout << "\tTrack Information" << std::endl;
 
-		do
+		while (entrynum--)
 		{
 			TRACK_ENTRY TrackEntry;
 
@@ -233,19 +230,20 @@ namespace cim2gdi
 			ZeroMemory(&CurrentTrack, sizeof(CurrentTrack));
 			CurrentTrack.StartAddress = LSN - 150;
 			CurrentTrack.PhysicalAddress = LSN;
-			CurrentTrack.TNO = TrackEntry.TrackNumber;
+			CurrentTrack.TNO = (TrackEntry.TrackNumber & 0x0F) + ((TrackEntry.TrackNumber & 0xF0) >> 4) * 10;
 			CurrentTrack.IDX = TrackEntry.Index;
 
 			PreviousTrack.Size = CurrentTrack.PhysicalAddress - PreviousTrack.PhysicalAddress;
-
+			// now we have prev track size in sectors, calculate it's data lenght and get current track data offset
 			if (PreviousTrack.TNO != 0)
 				cur_offset += PreviousTrack.Size * ((PreviousTrack.Type == TRACK_TYPE_MODE1) ? 2352 : 2450);
 			CurrentTrack.doffset = cur_offset;
 
-			if (PreviousTrack.TNO > 0 && PreviousTrack.TNO <= 0x99 && PreviousTrack.IDX != 0)
+			if (PreviousTrack.TNO > 0 && PreviousTrack.TNO <= 99 && PreviousTrack.IDX != 0)
 				p_Area.push_back(PreviousTrack);
 
-			// post gap detect (in GDI it is part of track)
+			// for some weird reason in GDI format, if audio track followed by data track, that next track's audio-type pregap must be part of previos track
+			// detect this case and append pregap to previous track
 			if (PreviousTrack.TNO == CurrentTrack.TNO && PreviousTrack.IDX == 0 && CurrentTrack.IDX == 0 && PreviousTrack.Type != CurrentTrack.Type)
 				p_Area.back().Size += PreviousTrack.Size;
 
@@ -257,9 +255,9 @@ namespace cim2gdi
 			{
 				TrackForm = "MODE1";
 				CurrentTrack.Type = TRACK_TYPE_MODE1;
-				CurrentTrack.dsize = 2048;
+				CurrentTrack.dsize = 2048;			// Extract data tracks as 2048, RAW 2352 is useless because CIM Utility doesn't generate EDC
 				CurrentTrack.dskip = 304;
-				CurrentTrack.doffset += 16;
+				CurrentTrack.doffset += 16;			// skip header
 			}
 			if( TrackEntry.Form == 0x00 )
 			{
@@ -278,11 +276,6 @@ namespace cim2gdi
 			else if( TrackEntry.TrackNumber == 0xAA )
 			{
 				std::cout << "LeadOut";
-
-				PreviousTrack = CurrentTrack;
-				ZeroMemory( &CurrentTrack, sizeof( CurrentTrack ) );
-
-				Track = false;
 			}
 			else
 			{
@@ -302,7 +295,8 @@ namespace cim2gdi
 			
 
 			std::cout << "LSN: " << LSN << std::endl;
-		}while( Track );
+
+		}
 
 		return 0;
 	}

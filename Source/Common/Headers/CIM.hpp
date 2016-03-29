@@ -52,7 +52,7 @@ namespace cim2gdi
 	{
 		char			ID[ 4 ];
 		// Offset to the disc folling this chunk
-		unsigned int	DiscOffset;
+		unsigned int	Size;
 		char			Padding[ 8 ];
 	};
 
@@ -69,7 +69,7 @@ namespace cim2gdi
 	{
 		// Data 0x41/Audio 0x01
 		unsigned char	Control;
-		// Canonical track number
+		// Canonical track number, BCD
 		unsigned char	TrackNumber;
 		// IDX 0 - pregap, 1 - track
         unsigned char	Index;
@@ -117,7 +117,7 @@ namespace cim2gdi
 
 	private:
 		int ParseHeader( );
-		int ExtractTracks( std::vector< TRACK > &p_Area );
+		int ExtractTracks(std::vector< TRACK > &p_Area, unsigned int entrynum);
 		void PrintTrackInformation( const std::vector< TRACK > &p_Area );
 		int WriteTracks( const std::vector< TRACK > &p_Area,
 			const AREA p_AreaType, const unsigned int p_Index = 0 );
