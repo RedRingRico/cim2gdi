@@ -52,7 +52,7 @@ namespace cim2gdi
 	{
 		char			ID[ 4 ];
 		// Offset to the disc folling this chunk
-		unsigned int	DiscOffset;
+		unsigned int	Size;
 		char			Padding[ 8 ];
 	};
 
@@ -69,10 +69,10 @@ namespace cim2gdi
 	{
 		// Data 0x41/Audio 0x01
 		unsigned char	Control;
-		// Canonical track number
+		// Canonical track number, BCD
 		unsigned char	TrackNumber;
-		// Seems to indicate the start/end of a track's padding (not sure)
-        unsigned char	Transform;
+		// IDX 0 - pregap, 1 - track
+        unsigned char	Index;
 		// MODE1 0x01/CCDA 0x02
 		unsigned char	Form;
 		// The following are in BCD (hours may be padding)
@@ -87,8 +87,14 @@ namespace cim2gdi
 	{
 		unsigned int	PhysicalAddress;
 		unsigned int	StartAddress;
+		unsigned int	TNO;
+		unsigned int	IDX;
 		unsigned int	Size;
 		TRACK_TYPE		Type;
+
+		unsigned int	doffset;
+		unsigned int	dsize;
+		unsigned int	dskip;
 	};
 #pragma pack( pop )
 
@@ -111,7 +117,7 @@ namespace cim2gdi
 
 	private:
 		int ParseHeader( );
-		int ExtractTracks( std::vector< TRACK > &p_Area );
+		int ExtractTracks(std::vector< TRACK > &p_Area, unsigned int entrynum);
 		void PrintTrackInformation( const std::vector< TRACK > &p_Area );
 		int WriteTracks( const std::vector< TRACK > &p_Area,
 			const AREA p_AreaType, const unsigned int p_Index = 0 );
