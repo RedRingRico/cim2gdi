@@ -42,7 +42,7 @@ functionality is lacking.
 
 
 | CREDITS |
-Thanks to p1pkin for fixing the way tracks are created, adding support for
+Thanks to MetalliC for fixing the way tracks are created, adding support for
 5+-track games, making the allocated memory amount more sensible, and making
 the track data extraction not dependent on a bunch of if statements with too
 many permutations.
